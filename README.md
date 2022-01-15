@@ -1,2 +1,3 @@
 # BME547_Classwork
-BME 547 Medical Software Design
+
+This is my repository for BME 547 classwork.
