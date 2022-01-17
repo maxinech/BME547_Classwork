@@ -71,4 +71,10 @@ def check_total_cholesterol(total_cholesterol_value):
 	return answer
 
 
+def total_cholesterol_driver():
+	total_cholesterol_value = accept_input("Total Cholesterol")
+	classification = check_total_cholesterol(total_cholesterol_value)
+	print_result("Total Cholesterol", total_cholesterol_value, classification)
+
+
 interface()
