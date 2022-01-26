@@ -1,7 +1,7 @@
 print("This is the blood_calculator module and python calls it {}".format(__name__))
 
 def interface():
-	print("Blood Test Analysis")
+	print("Blood Test Analysis v1.1")
 	keep_running = True
 	while keep_running:
 		print("Options:")
