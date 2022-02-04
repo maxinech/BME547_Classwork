@@ -34,7 +34,7 @@ def analysis(weight_input, diagnosis):
     return weight, dosage_mg_first_day
 
 
-def output(weigtht, dosage_mg_first_day)
+def output(weigtht, dosage_mg_first_day):
     print("CORRECT DOSAGE")
     print("For a patient weighing {:.1f} kg,".format(weight))
     print("  the correct dosage is {:.1f} mg the first day"
@@ -45,4 +45,3 @@ if __name__ == '__main__':
     weight_input, diagnosis = input_data()
     weight, dosage_mg_first_day = analysis(weight_input, diagnosis)
     output(weigtht, dosage_mg_first_day)
-
