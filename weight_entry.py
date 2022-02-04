@@ -30,4 +30,3 @@ def add(a, b):
 
 if __name__ == "__main__":
     input_weight_entry()
-
