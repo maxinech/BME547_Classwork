@@ -7,8 +7,6 @@ def calc_square_root(n):
         print("My_calculator module not available. Using default.")
     from warnings import warn
     warn("Your are running a not so good function.")
-
-
     try:
         x = 5
         answer = sqrt(n)
@@ -24,8 +22,7 @@ def calc_square_root(n):
     print(x, z)
 
 
-
-def main():    
+def main():
     print(calc_square_root(-4))
 
 
