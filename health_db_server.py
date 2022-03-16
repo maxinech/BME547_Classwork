@@ -248,8 +248,8 @@ def get_patient_tests_from_database(patient_id):
 
     for patient in db:
         if patient["id"] == int(patient_id):
-            return jsonify(patient["tests"]), 200
-    return "Patient id {} is not in database".format(patient_id), 400
+            return patient["tests"], 200
+    return "Patient_id {} was not found".format(patient_id), 400
 
 
 @app.route("/add_test", methods=["POST"])
@@ -296,7 +296,7 @@ def add_test_driver(in_data):
                   database or error message if not, followed by a status code
     """
     expected_keys = ["id", "test_name", "test_result"]
-    expected_types = [int, str, str]
+    expected_types = [int, str, int]
     answer, status_code = validate_server_input(in_data, expected_keys,
                                                 expected_types)
     if status_code != 200:
