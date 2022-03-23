@@ -12,10 +12,10 @@ def get_database_record():
 
 
 def put_new_record():
-    from database_info import Patient
+    from health_db_server import Patient
     new_patient = Patient(name="David", patient_id=1)
     new_patient.save()
 
 
 if __name__ == "__main__":
-    put_new_record()
+    get_database_record()
