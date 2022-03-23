@@ -1,30 +1,32 @@
 import logging
 from flask import Flask, request, jsonify
+from pymodm import connect
+from pymodm import errors as pymodm_errors
+
+# The MongoModel class that describes the document format for the MongoDB
+# database is defined in a separate module and imported here
+from database_info import Patient
 
 # Define variable to contain Flask class for server
 app = Flask(__name__)
 
-# Create list for database to contain patient data
-db = []
-
 
 def init_server():
-    """Initializes server conditions
+    """ Initializes server conditions
 
-    This function initializes the server log and can be used for any other
-    tasks that you would like to run upon initial server start-up.  For
-    example, it currently adds two patients to the database so that there is
-    content in the database for testing.  Also, in the future, when an external
-    database is utilized, the connection to that external database can be
-    established here.
+    This function can be used for any specific tasks that you would like to run
+    upon initial server start-up.  Currently, it configures the logging
+    functionality and it makes a connection to a MongoDB database.
 
     Note:  As currently written, this function does not need a unit test as
     it does not do any data manipulation itself.
     """
-    add_patient_to_db("Ann Ables", 101, "A+")
-    add_patient_to_db("Bob Boyles", 202, "B-")
     logging.basicConfig(filename="health_db_server.log", level=logging.DEBUG,
                         filemode='w')
+    print("Connecting to database...")
+    connect("mongodb+srv://maxinech:Mikan54669@bme547."
+            "wdo8g.mongodb.net/health_db?retryWrites=true&w=majority")
+    print("Connection attempt finished")
 
 
 @app.route("/new_patient", methods=["POST"])
@@ -52,7 +54,7 @@ def new_patient_handler():
     """
     # Get the data from the request
     in_data = request.get_json()
-    # Call OTHER function to Do the request
+    # Call OTHER function to do the request
     answer, status_code = new_patient_driver(in_data)
     # Provide a response
     return jsonify(answer), status_code
@@ -91,7 +93,6 @@ def new_patient_driver(in_data):
     if status_code != 200:
         return answer, status_code
     add_patient_to_db(in_data["name"], in_data["id"], in_data["blood_type"])
-    print(db)
     return True, 200
 
 
@@ -133,19 +134,16 @@ def validate_server_input(in_data, expected_keys, expected_types):
 def add_patient_to_db(patient_name, id_no, blood_type):
     """Creates new patient database entry
 
-    This function receives information about the patient, creates a new
-    dictionary containing the patient information, and appends the diction to
-    the database list.
+    This function receives information about the patient and creates an
+    instance of the Patient class which is the MongoModel that describes the
+    contents of each document to be added to the MongoDB database.  See the
+    description of the Patient class in the database_info.py module.
 
-    The dictionary for each patient will have the following format:
-        {"name": <name_string>,
-         "id": <id_int>,
-         "blood_type": <string>,
-         "tests": <dictionary>}
-    The "tests" dictionary will look like this:
-        {"test_name1": [test_result1, test_result2, etc.],
-         "test_name2": [test_result3, test_result4, etc.],
-         etc. }
+    Since this is a new patient with no test results currently, the tests
+    field of the Patient is not utilized here.
+
+    Once the Patient instance is created.  The "save" method is used to add it
+    to the MongoDB database.
 
     Args:
         patient_name (str): name of patient
@@ -153,14 +151,15 @@ def add_patient_to_db(patient_name, id_no, blood_type):
         blood_type (str):  patient blood type, ex. "AB+"
 
     Returns:
-        bool: True indicating that the patient was successfully saved to the
-            database
+        Patient: an instance of the Patient class containing the information
+        saved to the MongoDB database.
     """
 
-    new_patient = {"name": patient_name, "id": id_no,
-                   "blood_type": blood_type, "tests": {}}
-    db.append(new_patient)
-    return True
+    new_patient = Patient(name=patient_name,
+                          patient_id=id_no,
+                          blood_type=blood_type)
+    saved_patient = new_patient.save()
+    return saved_patient
 
 
 @app.route("/get_results/<patient_id>", methods=["GET"])
@@ -196,11 +195,11 @@ def get_results_driver(patient_id):
 
     Args:
         patient_id (str): the patient id taken from the variable URL
-
     Returns:
         str, int: An error message if patient_id was invalid or a results
         string containing the patient data, plus a status code.
     """
+
     answer, status_code = validate_convert_patient_id(patient_id)
     if status_code != 200:
         return answer, status_code
@@ -233,10 +232,11 @@ def validate_convert_patient_id(patient_id):
 def get_patient_tests_from_database(patient_id):
     """Retrieves test results for a patient from the database
 
-    The database list of dictionaries is searched for the dictionary with
-    the correct patient_id in the "id" key-value pair.  When found, the
-    "test" value is returned with a 200 status code.  If the patient id is not
-    found, an error message string and a 400 status code are returned
+    A search request is made to the MongoDB database.  This request is looking
+    at the primary key ("_id) that matches the patient_id sent as a parameter
+    to this function.  If no record is returned, the DoesNotExist exception is
+    captured and a message and 400 status code are returned.  If a record is
+    found, the "tests" field of that record is returned with a 200 status code.
 
     Args:
         patient_id (int): the patient id to find in the database
@@ -244,12 +244,44 @@ def get_patient_tests_from_database(patient_id):
     Returns:
         dict or string, int: A dictionary of test results if the patient id is
         found, otherwise an error string; status code
-    """
 
-    for patient in db:
-        if patient["id"] == int(patient_id):
-            return patient["tests"], 200
-    return "Patient_id {} was not found".format(patient_id), 400
+    """
+    try:
+        patient = Patient.objects.raw({"_id": patient_id}).first()
+    except pymodm_errors.DoesNotExist:
+        return "Patient_id {} was not found".format(patient_id), 400
+    return patient.tests, 200
+
+
+def get_patient_from_database(patient_id):
+    """Retrieves test results for a patient from the database
+
+    A search request is made to the MongoDB database.  This request is looking
+    at the primary key ("_id) that matches the patient_id sent as a parameter
+    to this function.  If no record is returned, the DoesNotExist exception is
+    captured and a message and 400 status code are returned.  If a record is
+    found, an instance of the Patient class is returned with that record.
+
+    NOTE:  The DRY software design principle is being violated with this
+    function and the previous function "get_patient_tests_from_database".  Both
+    do a similar search for a Patient record.  While this was done for
+    convenience during class, it would be better to have only one function do
+    the search and then have a second function extract the tests from the
+    results of that one search.
+
+    Args:
+        patient_id (int): the patient id to find in the database
+
+    Returns:
+        Patient or string, int: A Patient instance containing the found record,
+        otherwise an error string; status code
+
+    """
+    try:
+        patient = Patient.objects.raw({"_id": patient_id}).first()
+    except pymodm_errors.DoesNotExist:
+        return "Patient_id {} was not found".format(patient_id), 400
+    return patient, 200
 
 
 @app.route("/add_test", methods=["POST"])
@@ -302,7 +334,6 @@ def add_test_driver(in_data):
     if status_code != 200:
         return answer, status_code
     answer, status_code = add_test_to_patient(in_data)
-    print(db)
     return answer, status_code
 
 
@@ -310,15 +341,16 @@ def add_test_to_patient(in_data):
     """ Finds the specified patient and adds a new test result to the patient
     record
 
-    The function calls another function that finds the specified patient and
-    returns the "tests" dictionary for that patient if the patient exists.
-    If the patient does not exist, a status code of 400 is returned and this
-    function returns the error message and status code.  If the patient did
-    exist, the function checks to see if the test_name already exists as a key
-    in the "tests" dictionary.  If so, it appends the sent test_result to the
-    list associated with the key.  If not, a new key is created using the test
-    name and a new list with the single result is created.  The function then
-    return a success message and a status code of 200.
+    The function calls another function that finds the specified patient to
+    which the test should be added. If the patient does not exist, a status
+    code of 400 is returned and this function returns the error message and
+    status code.  If the patient did exist, the function checks to see if the
+    test_name already exists as a key in the "tests" dictionary field of the
+    "patient".  If so, it appends the sent test_result to the list associated
+    with the key.  If not, a new key is created using the test name and a new
+    list with the single result is created.  The updated "patient" is then
+    saved to the database.  The function then returns a success message and a
+    status code of 200.
 
     Args:
         in_data (dict): contains the patient id, the name of the test to add,
@@ -326,18 +358,20 @@ def add_test_to_patient(in_data):
 
     Returns:
         str, int: a success or error message, status code
+
     """
-    tests, status_code = get_patient_tests_from_database(in_data["id"])
+    patient, status_code = get_patient_from_database(in_data["id"])
     if status_code == 400:
-        return tests, status_code
+        return patient, status_code
     test_name = in_data["test_name"]
-    if test_name in tests:
-        tests["test_name"].append(in_data["test_result"])
+    if test_name in patient.tests:
+        patient.tests[test_name].append(in_data["test_result"])
     else:
-        tests["test_name"] = [in_data["test_result"]]
+        patient.tests[test_name] = [in_data["test_result"]]
+    patient.save()
     return "Test added", 200
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     init_server()
     app.run()

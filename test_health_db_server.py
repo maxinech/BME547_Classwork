@@ -1,4 +1,9 @@
 import pytest
+from pymodm import connect
+from database_info import Patient
+
+connect("mongodb+srv://maxinech:Mikan54669@bme547."
+        "wdo8g.mongodb.net/health_db?retryWrites=true&w=majority")
 
 
 @pytest.mark.parametrize("input_dictionary, expected", [
@@ -34,12 +39,12 @@ def test_new_patient_driver(in_data, expected):
     ("David", 1, "O+")
 ])
 def test_add_patient_to_db(patient_name, id_no, blood_type):
-    from health_db_server import add_patient_to_db, db
-    add_patient_to_db(patient_name, id_no, blood_type)
-    answer = db[-1]
-    expected = {"name": patient_name, "id": id_no, "blood_type": blood_type,
-                "tests": {}}
-    assert answer == expected
+    from health_db_server import add_patient_to_db
+    answer = add_patient_to_db(patient_name, id_no, blood_type)
+    answer.delete()
+    assert answer.name == patient_name
+    assert answer.patient_id == id_no
+    assert answer.blood_type == blood_type
 
 
 @pytest.mark.parametrize("patient_id, expected, expected_status_code", [
@@ -58,8 +63,9 @@ def test_validate_convert_patient_id(patient_id, expected,
 def test_get_patient_tests_from_database_find_patient():
     from health_db_server import add_patient_to_db, \
         get_patient_tests_from_database
-    add_patient_to_db("Eugene", 555, "A+")
+    test_patient = add_patient_to_db("Eugene", 555, "A+")
     answer, status_code = get_patient_tests_from_database(555)
+    test_patient.delete()
     assert answer == {}
     assert status_code == 200
 
@@ -79,26 +85,34 @@ def test_get_patient_tests_from_database_bad_patient():
 def test_get_results_driver(new_patient_id, search_id_string, expected_code):
     from health_db_server import get_results_driver, add_patient_to_db
     if new_patient_id is not None:
-        add_patient_to_db("Test Patient Name", new_patient_id, "O+")
+        test_patient = add_patient_to_db("Test Patient Name", new_patient_id,
+                                         "O+")
     answer, status_code = get_results_driver(search_id_string)
-    assert status_code, expected_code
+    if new_patient_id is not None:
+        test_patient.delete()
+    assert status_code == expected_code
 
 
 @pytest.mark.parametrize("new_patient_id, patient_id_int, test_name,"
                          "test_result, expected_code", [
                           (345, 345, "HDL", 50, 200),
-                          (None, 345, "LDL", 40, 200),
-                          (None, 345, "HDL", 51, 200),
+                          (345, 345, "LDL", 40, 200),
+                          (345, 345, "HDL", 51, 200),
                           (None, 3456, "HDL", 50, 400),
                          ])
 def test_add_test_to_patient(new_patient_id, patient_id_int, test_name,
                              test_result, expected_code):
     from health_db_server import add_test_to_patient, add_patient_to_db
     if new_patient_id is not None:
-        add_patient_to_db("Test Patient Name", new_patient_id, "O+")
+        test_patient = add_patient_to_db("Test Patient Name", new_patient_id,
+                                         "O+")
     test_data = {"id": patient_id_int, "test_name": test_name,
                  "test_result": test_result}
     answer, status_code = add_test_to_patient(test_data)
+    if new_patient_id is not None:
+        find_patient = Patient.objects.raw({"_id": patient_id_int}).first()
+        test_patient.delete()
+        assert find_patient.tests[test_name][-1] == test_result
     assert status_code == expected_code
 
 
@@ -106,12 +120,15 @@ def test_add_test_to_patient(new_patient_id, patient_id_int, test_name,
     (345, {"id": 345, "test_name": "HDL", "test_result": 50}, 200),
     (None, {"ixd": 345, "test_name": "HDL", "test_result": 50}, 400),
     (None, {"id": "junk", "test_name": "HDL", "test_result": 50}, 400),
-    (None, {"id": 345, "test_name": "HDL", "test_result": 51}, 200),
+    (345, {"id": 345, "test_name": "HDL", "test_result": 51}, 200),
     (None, {"id": 3456, "test_name": "HDL", "test_result": 50}, 400),
 ])
 def test_add_test_driver(new_patient_id, test_data, expected_code):
     from health_db_server import add_test_driver, add_patient_to_db
     if new_patient_id is not None:
-        add_patient_to_db("Test Patient Name", new_patient_id, "O+")
+        test_patient = add_patient_to_db("Test Patient Name", new_patient_id,
+                                         "O+")
     answer, status_code = add_test_driver(test_data)
+    if new_patient_id is not None:
+        test_patient.delete()
     assert status_code == expected_code
