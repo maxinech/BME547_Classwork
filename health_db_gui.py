@@ -2,6 +2,14 @@ import tkinter as tk
 from tkinter import ttk
 
 
+def verify_GUI_inputs(input_id):
+    try:
+        id_integer = int(input_id)
+    except ValueError:
+        return False
+    return id_integer
+
+
 def main_window():
     """Creates and runs a GUI for the health database
 
@@ -30,14 +38,23 @@ def main_window():
         data to a server.
 
         """
-        print("Here is the data")
+        from health_db_client import upload_patient_data_to_server
+        # Get Data From Interface
         entered_name = name_entry.get()
-        print("Name: {}".format(entered_name))
         entered_id = id_entry.get()
-        print("Id: {}".format(entered_id))
         entered_blood_letter = blood_letter.get()
         entered_rh_factor = rh_factor.get()
-        print("Blood type: {}".format(entered_blood_letter+entered_rh_factor))
+        entered_blood_type = entered_blood_letter + entered_rh_factor
+        # Call Other Functions To Do The Work
+        patient_number = verify_GUI_inputs(entered_id)
+        if patient_number is False:
+            status_label.configure(text="Patient id must be an integer.")
+            return
+        status_string = upload_patient_data_to_server(entered_name,
+                                                      patient_number,
+                                                      entered_blood_type)
+        # Update Interface based on results
+        status_label.configure(text=status_string)
 
     # Create root/base window
     root = tk.Tk()
@@ -84,6 +101,10 @@ def main_window():
     center_dropdown.grid(column=2, row=1)
     center_dropdown["values"] = ("Durham", "Raleigh", "Cary", "Apex")
     center_dropdown.state(['readonly'])
+
+    # Status indicator
+    status_label = ttk.Label(root, text="Status")
+    status_label.grid(column=0, row=20)
 
     # Buttons
     ttk.Button(root, text="Ok", command=ok_cmd).grid(column=1, row=20)
